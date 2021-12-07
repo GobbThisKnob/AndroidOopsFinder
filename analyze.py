@@ -26,17 +26,21 @@ def get_senesitive_api_calls():
 def check_permission_usage():
     pass
 
-def check_for_http():
-    pass
+def check_for_http(dx):
+    try:
+        for _, meth in dx.strings["http://"].get_xref_from():
+            print("Used in: {} -- {}".format(meth.class_name, meth.name))
+    except KeyError:
+        print("http:// not used")
 
 def find_implicit_intents():
     pass
 
-
 def main():
     filename = sys.argv[1]
     a,d,dx = misc.AnalyzeAPK(filename)  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
-    print(dx.get_classes())
-    
+    #print(dx.get_classes())
+    check_for_http(dx)
+
 if __name__ == "__main__":
     main()
