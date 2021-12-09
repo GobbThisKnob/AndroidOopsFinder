@@ -12,13 +12,23 @@ RQ7: Do applications use implicit Intents?
 RQ8: Do apps request more permissions than they use?
 RQ9: Do applications call sensitive APIs?
 """
-
+from lxml.etree import tostring
 import sys
 import androguard  #pip -U install androguard
 from androguard import misc, core
 
-def permission_protected_services():
-    pass
+android = "{http://schemas.android.com/apk/res/android}"
+
+def permission_protected_services(a):
+    receivers = a.get_receivers()
+    xml = a.get_android_manifest_xml()
+    receivers = xml.xpath("//receiver")
+    for receiver in receivers:
+        if android+"permission" not in receiver.attrib:
+            print("receiver not permission protected: {}".format(receiver))
+    
+    #this gets the receivers in the manifest. .attrib is a dict with shit like android:permission
+    #print(xml.xpath("//receiver")[0].attrib[android+"permission"])
 
 def get_senesitive_api_calls():
     pass
@@ -41,6 +51,7 @@ def main():
     a,d,dx = misc.AnalyzeAPK(filename)  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
     #print(dx.get_classes())
     check_for_http(dx)
+    permission_protected_services(a)
 
 if __name__ == "__main__":
     main()
