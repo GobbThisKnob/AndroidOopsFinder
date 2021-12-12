@@ -1,20 +1,19 @@
 """
 RQ1: Do applications take input from other apps, and
 use it without sanitizing it?
-RQ2: Do applications permission protect Services, Re-
+--Q2: Do applications permission protect Services, Re-
 ceivers, and Broadcast?
 RQ3: Do applications export private data to the Net-
 work?
-RQ4: Do apps use HTTPS for network communication?
-RQ5: Do apps verify certificates incorrectly?
-RQ6: Do applications override TrustManagers?
+--RQ4: Do apps use HTTPS for network communication?
+--RQ5: Do apps verify certificates incorrectly?
+--RQ6: Do applications override TrustManagers?
 RQ7: Do applications use implicit Intents?
 RQ8: Do apps request more permissions than they use?
-RQ9: Do applications call sensitive APIs?
+--RQ9: Do applications call sensitive APIs?
 """
 from lxml.etree import tostring
-import os
-import sys
+import sys, os, glob
 import androguard  #pip -U install androguard
 from androguard import misc, core
 
@@ -39,30 +38,56 @@ def get_senesitive_api_calls(a):
         if "android.permission."+ dangerous_permission in app_permissions:
             print(dangerous_permission)
 
-def check_permission_usage():
-    pass
+# def check_permission_usage():
+#     pass
+
+def override_TrustManagers(dx):
+    for c in dx.get_classes():
+        if c.is_external():
+            continue
+
+        if 'Ljavax/net/ssl/X509TrustManager;' in c.orig_class.interfaces:
+            print(c.orig_class.get_name())
+    # print("Usage of TrustManager")
+    # try:
+    #     dx.find_classes("Ljavax/net/ssl/X509TrustManager;")
+    # except KeyError:
+    #     print("No TrustManagers overridden")
 
 def check_for_http(dx):
     print("incorrect usage of http://:")
     try:
+        # print(dx.strings["http://"])
         for _, meth in dx.strings["http://"].get_xref_from():
             print("Used in class: {} -- method: {}".format(meth.class_name, meth.name))
     except KeyError:
         print("http:// not used")
 
-def find_implicit_intents():
-    pass
+# def find_implicit_intents(dx):
+#     for c in dx.get_classes():
+#         if c.is_external():
+#             continue
+
+#         fields = [typ.get_class_name()for typ in c.orig_class.get_fields()]
+#         if 'Landroid/content/Intent;' in fields:
+#             print("Implicit: ", fields)
+def export_data(dx, apk):
+    os.system("java -jar soot-infoflow-cmd-2.9.0-jar-with-dependencies.jar --apkfile={} -p {} -s FlowDroid/soot-infoflow-android/SourcesAndSinks.txt".format(apk, str(os.system("echo $HOME")) + "/Android/Sdk/platforms"))
 
 def main():
     # I have my apks in a folder in the same directory as the program
     # We can change how we iterate through the apks if you want
-    path = os.getcwd()+"/random_apks"
-    apks = os.listdir(path)
+    if not os.path.exists("./FlowDroid"):
+        os.system("git clone https://github.com/secure-software-engineering/FlowDroid.git")
+    apks = glob.glob(sys.argv[1] + '*.apk')
     for apk in apks:
-        a,d,dx = misc.AnalyzeAPK("random_apks/"+apk)  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
+        a,d,dx = misc.AnalyzeAPK(apk)  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
     
         print(apk)
         check_for_http(dx)
+        # override_TrustManagers(dx)
+        # find_implicit_intents(dx)
+        export_data(dx, apk)
         permission_protected_services(a)
         get_senesitive_api_calls(a)
         print()
