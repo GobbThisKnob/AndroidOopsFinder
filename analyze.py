@@ -13,7 +13,7 @@ RQ8: Do apps request more permissions than they use?
 --RQ9: Do applications call sensitive APIs?
 """
 from lxml.etree import tostring
-import sys, os, glob, subprocess
+import sys, os, glob, subprocess, _thread, time
 import androguard  #pip -U install androguard
 from androguard import misc, core
 from lxml import etree
@@ -109,6 +109,26 @@ def main():
     if not os.path.exists("./FlowDroid"):
         os.system("git clone https://github.com/secure-software-engineering/FlowDroid.git")
     apks = glob.glob(sys.argv[1] + '*.apk')
+    def analyze(apks, i, j):
+        for n in range(i,j):
+            a,d,dx = misc.AnalyzeAPK(apks[n])  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
+            export_data(dx, apks[n])
+        try:
+            with open("./leaks.xml", "r") as xml:
+                tree = etree.fromstring(xml.read().encode('utf-8'))
+                print("Leaks: ", tree.xpath('count(//Result)'))
+                leaks.append(tree.xpath('count(//Result)'))
+        except:
+            pass
+        os.system('rm leaks.xml')
+
+    try:
+        _thread.start_new_thread(analyze, (apks, 0, 16, ))
+        _thread.start_new_thread(analyze, (apks,16, 33))
+        _thread.start_new_thread(analyze, (apks, 33, 50))
+    except:
+        print("Thread no worky")
+
     for apk in apks:
         global count
         # count =0
@@ -122,10 +142,13 @@ def main():
         # override_TrustManagers(dx)
         # find_implicit_intents(dx)
         export_data(dx, apk)
-        with open("./leaks.xml", "r") as xml:
-            tree = etree.fromstring(xml.read().encode('utf-8'))
-            print("Leaks: ", tree.xpath('count(//Result)'))
-            leaks.append(tree.xpath('count(//Result)'))
+        try:
+            with open("./leaks.xml", "r") as xml:
+                tree = etree.fromstring(xml.read().encode('utf-8'))
+                print("Leaks: ", tree.xpath('count(//Result)'))
+                leaks.append(tree.xpath('count(//Result)'))
+        except:
+            pass
         os.system('rm leaks.xml')
         # print(leaks.split('\n')[-1])
 
