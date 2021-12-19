@@ -86,10 +86,9 @@ def check_for_http(dx):
 #         if 'Landroid/content/Intent;' in fields:
 #             print("Implicit: ", fields)
 
-def export_data(dx, apk):
+def export_data(apk):
     home = subprocess.check_output("echo $HOME", shell=True, text=True).strip()
-    command = "java -jar soot-infoflow-cmd-2.9.0-jar-with-dependencies.jar --apkfile={} -p {} -s FlowDroid/soot-infoflow-android/SourcesAndSinks.txt".format(
-        apk, home + "/Android/Sdk/platforms")
+    command = "java -jar soot-infoflow-cmd-2.9.0-jar-with-dependencies.jar --apkfile={} -p {} -s FlowDroid/soot-infoflow-android/SourcesAndSinks.txt".format(apk, home + "/Android/Sdk/platforms")
     # print(command)
     # result = subprocess.run(['java', '-jar', 'soot-infoflow-cmd-2.9.0-jar-with-dependencies.jar', 
     #     '--apkfile={}'.format(apk), '-p', home + '/Android/Sdk/platforms', '-s', 
@@ -103,73 +102,69 @@ def main():
     # We can change how we iterate through the apks if you want
     http = []
     leaks = []
-    recievers = []
+    receivers = []
     permis = []
+    trust = []
 
     if not os.path.exists("./FlowDroid"):
         os.system("git clone https://github.com/secure-software-engineering/FlowDroid.git")
     apks = glob.glob(sys.argv[1] + '*.apk')
     def analyze(apks, i, j):
         for n in range(i,j):
-            a,d,dx = misc.AnalyzeAPK(apks[n])  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
-            export_data(dx, apks[n])
-        try:
-            with open("./leaks.xml", "r") as xml:
-                tree = etree.fromstring(xml.read().encode('utf-8'))
-                print("Leaks: ", tree.xpath('count(//Result)'))
-                leaks.append(tree.xpath('count(//Result)'))
-        except:
-            pass
-        os.system('rm leaks.xml')
+            export_data(apks[n])
+            try:
+                with open("./leaks.xml", "r") as xml:
+                    tree = etree.fromstring(xml.read().encode('utf-8'))
+                    print("Leaks: ", tree.xpath('count(//Result)'))
+                    leaks.append(tree.xpath('count(//Result)'))
+            except:
+                pass
+            os.system('rm leaks.xml')
+        print("Leaks = ", leaks)
 
     try:
-        _thread.start_new_thread(analyze, (apks, 0, 16, ))
-        _thread.start_new_thread(analyze, (apks,16, 33))
-        _thread.start_new_thread(analyze, (apks, 33, 50))
+        _thread.start_new_thread(analyze, (apks, 0, 13))
+        _thread.start_new_thread(analyze, (apks,13, 25))
+        _thread.start_new_thread(analyze, (apks, 25, 38))
     except:
         print("Thread no worky")
 
+    analyze2(apks, http, leaks, receivers, permis, trust)
+    
+
+def analyze2(apks, http, leaks, receivers, permis, trust):
     for apk in apks:
         global count
-        # count =0
+        count =0
         a,d,dx = misc.AnalyzeAPK(apk)  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
-    
+
         print(apk)
         check_for_http(dx)
         print("http misuse: ", count)
         http.append(count)
         count=0
-        # override_TrustManagers(dx)
-        # find_implicit_intents(dx)
-        export_data(dx, apk)
-        try:
-            with open("./leaks.xml", "r") as xml:
-                tree = etree.fromstring(xml.read().encode('utf-8'))
-                print("Leaks: ", tree.xpath('count(//Result)'))
-                leaks.append(tree.xpath('count(//Result)'))
-        except:
-            pass
-        os.system('rm leaks.xml')
-        # print(leaks.split('\n')[-1])
 
         permission_protected_services(a)
         print("Unprotected services: ", count)
-        recievers.append(count)
+        receivers.append(count)
         count=0
 
         dp = get_senesitive_api_calls(a)
         print("Dangerous permissions: ", count, dp)
         permis.append(count)
         count=0
+
+        override_TrustManagers(dx)
+        print("TrustManagers: ", count)
+        trust.append(count)
+        count =  0
+        
         print()
-    
     print("Leaks: ", leaks)
-    """filename = sys.argv[1]
-    a,d,dx = misc.AnalyzeAPK(filename)  # a -> apk object, d -> DalvikVMFormat object, dx -> Analysis object
-    
-    check_for_http(dx)
-    permission_protected_services(a)
-    get_senesitive_api_calls(a)"""
+    print("Permissions: ", permis)
+    print("Receivers: ", receivers)
+    print("http: ", http)
+    print("Trust: ", trust)
 
 if __name__ == "__main__":
     main()
